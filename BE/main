@@ -1,0 +1,46 @@
+import os
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from app.api import regions, blooms, forecast
+from app.models import ErrorResponse
+from dotenv import load_dotenv
+
+load_dotenv()
+
+app = FastAPI(
+    title="BloomWatch API",
+    description="BloomWatch: Flowering/Bloom Event & Pollinator Risk Detection API for Bangladesh",
+    version="1.0.0"
+)
+
+# CORS setup (allow local frontend, adjust as needed)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:3000").split(","),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=ErrorResponse(error=exc.detail, status=exc.status_code).dict()
+    )
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content=ErrorResponse(error=str(exc), status=500).dict()
+    )
+
+# Mount API routers
+app.include_router(regions.router, prefix="/api/regions", tags=["Regions"])
+app.include_router(blooms.router, prefix="/api/blooms", tags=["Blooms"])
+app.include_router(blooms.heatmap_router, prefix="/api/heatmap", tags=["Heatmap"])
+app.include_router(forecast.router, prefix="/api/forecast", tags=["Forecast"])
+app.include_router(forecast.status_router, prefix="/api/status", tags=["Status"])
+app.include_router(forecast.login_router, prefix="/api/login", tags=["Auth"])
